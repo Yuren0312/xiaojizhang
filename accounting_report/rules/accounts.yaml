@@ -1,0 +1,148 @@
+﻿# 科目表
+#
+# 字段说明：
+#   type    asset / liability / equity / revenue / expense
+#   bs      资产负债表行次；bs_sub 为「其中」明细行次（同时计入 bs 与 bs_sub）
+#   is      利润表行次；  is_sub 同理
+#   cash    是否现金及现金等价物
+#   cf_in   本科目作为「现金流入」的对方科目时，归到现金流量表第几行
+#   cf_out  本科目作为「现金流出」的对方科目时，归到第几行
+#
+# 只要科目在这里有定义，分录就能记；没定义的科目会直接报错，不静默入账。
+
+aliases:
+  银行存款: 货币资金
+  库存现金: 货币资金
+  现金: 货币资金
+  银行存款_中国工商银行: 货币资金
+  主营业务收入: 营业收入
+  其他业务收入: 营业收入
+  主营业务成本: 营业成本
+  实收资本: 实收资本（或股本）
+  本年利润: 未分配利润
+  # 凭证中的细粒度科目 -> 标准科目
+  财务费用_银行手续费: 财务费用
+  财务费用_利息支出: 财务费用-利息
+  管理费用_业务招待: 业务招待费
+  管理费用_招待: 业务招待费
+  管理费用_办公费: 管理费用
+  管理费用_服务费: 管理费用
+  管理费用_福利费: 管理费用
+  管理费用_社保: 管理费用
+  管理费用_公积金: 管理费用
+  管理费用_折旧: 管理费用
+  应付账款_阿里云计算有限公司: 应付账款
+  应付账款_深圳市腾讯计算机系统有限公司: 应付账款
+  预付账款_阿里云计算有限公司: 预付账款
+  其他应付款_预付报销款: 其他应付款
+  # 兼容连字符写法（mapping.yaml/手填单据混用 - 与 _ 时不再报未定义科目）
+  其他应付款-预付报销款: 其他应付款
+  其他应付款_股东A: 其他应付款
+  其他应付款-股东A: 其他应付款
+  营业外收入_手续费退费: 营业外收入
+  财务费用_利息收入: 财务费用-利息
+  利润分配: 未分配利润
+
+accounts:
+
+  # ---------- 流动资产 ----------
+  货币资金:      {type: asset, bs: 1, cash: true}
+  短期投资:      {type: asset, bs: 2, cf_in: 8, cf_out: 11}
+  应收票据:      {type: asset, bs: 3, cf_in: 1, cf_out: 2}
+  应收账款:      {type: asset, bs: 4, cf_in: 1, cf_out: 2}
+  预付账款:      {type: asset, bs: 5, cf_in: 2, cf_out: 3}
+  应收股利:      {type: asset, bs: 6, cf_in: 9, cf_out: 2}
+  应收利息:      {type: asset, bs: 7, cf_in: 2, cf_out: 2}
+  其他应收款:    {type: asset, bs: 8, cf_in: 2, cf_out: 6}
+  存货:          {type: asset, bs: 9, cf_in: 2, cf_out: 3}
+  原材料:        {type: asset, bs: 9, bs_sub: 10, cf_in: 2, cf_out: 3}
+  在产品:        {type: asset, bs: 9, bs_sub: 11, cf_in: 2, cf_out: 3}
+  库存商品:      {type: asset, bs: 9, bs_sub: 12, cf_in: 2, cf_out: 3}
+  周转材料:      {type: asset, bs: 9, bs_sub: 13, cf_in: 2, cf_out: 3}
+  其他流动资产:  {type: asset, bs: 14, cf_in: 2, cf_out: 6}
+
+  # ---------- 非流动资产 ----------
+  长期债券投资:      {type: asset, bs: 16, cf_in: 8, cf_out: 11}
+  长期股权投资:      {type: asset, bs: 17, cf_in: 8, cf_out: 11}
+  固定资产原价:      {type: asset, bs: 18, cf_in: 10, cf_out: 12}
+  累计折旧:          {type: asset_contra, bs: 19}
+  在建工程:          {type: asset, bs: 21, cf_in: 2, cf_out: 12}
+  工程物资:          {type: asset, bs: 22, cf_in: 2, cf_out: 12}
+  固定资产清理:      {type: asset, bs: 23, cf_in: 10, cf_out: 12}
+  生产性生物资产:    {type: asset, bs: 24, cf_in: 10, cf_out: 12}
+  无形资产:          {type: asset, bs: 25, cf_in: 10, cf_out: 12}
+  开发支出:          {type: asset, bs: 26, cf_in: 2, cf_out: 12}
+  长期待摊费用:      {type: asset, bs: 27, cf_in: 2, cf_out: 6}
+  其他非流动资产:    {type: asset, bs: 28, cf_in: 10, cf_out: 12}
+
+  # ---------- 流动负债 ----------
+  短期借款:      {type: liability, bs: 31, cf_in: 14, cf_out: 16}
+  应付票据:      {type: liability, bs: 32, cf_in: 2, cf_out: 3}
+  应付账款:      {type: liability, bs: 33, cf_in: 2, cf_out: 3}
+  预收账款:      {type: liability, bs: 34, cf_in: 1, cf_out: 2}
+  应付职工薪酬:  {type: liability, bs: 35, cf_in: 2, cf_out: 4}
+  应交税费:      {type: liability, bs: 36, cf_in: 2, cf_out: 5}
+  应交税费-应交增值税:       {type: liability, bs: 36, cf_in: 2, cf_out: 5}
+  应交税费-未交增值税:       {type: liability, bs: 36, cf_in: 2, cf_out: 5}
+  应交税费-城市维护建设税:   {type: liability, bs: 36, cf_in: 2, cf_out: 5}
+  应交税费-教育费附加:       {type: liability, bs: 36, cf_in: 2, cf_out: 5}
+  应交税费-地方教育附加:     {type: liability, bs: 36, cf_in: 2, cf_out: 5}
+  应交税费-应交所得税:       {type: liability, bs: 36, cf_in: 2, cf_out: 5}
+  应付利息:      {type: liability, bs: 37, cf_in: 2, cf_out: 17}
+  应付利润:      {type: liability, bs: 38, cf_in: 2, cf_out: 18}
+  其他应付款:    {type: liability, bs: 39, cf_in: 2, cf_out: 6}
+  其他流动负债:  {type: liability, bs: 40, cf_in: 2, cf_out: 6}
+
+  # ---------- 非流动负债 ----------
+  长期借款:        {type: liability, bs: 42, cf_in: 14, cf_out: 16}
+  长期应付款:      {type: liability, bs: 43, cf_in: 14, cf_out: 16}
+  递延收益:        {type: liability, bs: 44, cf_in: 2, cf_out: 2}
+  其他非流动负债:  {type: liability, bs: 45, cf_in: 2, cf_out: 6}
+
+  # ---------- 所有者权益 ----------
+  实收资本（或股本）:  {type: equity, bs: 48, cf_in: 15, cf_out: 16}
+  资本公积:            {type: equity, bs: 49, cf_in: 15, cf_out: 16}
+  盈余公积:            {type: equity, bs: 50}
+  # 分红/利润分配（借未分配利润 贷银行存款）→ 筹资流出「分配股利、利润或偿付利息」line 18，
+  # 不归经营流出 line 6（白班10：分红导致 BS 不平 + 现金流误分类）
+  未分配利润:          {type: equity, bs: 51, cf_in: 15, cf_out: 18}
+
+  # ---------- 损益类 ----------
+  营业收入:      {type: revenue, is: 1, cf_in: 1}
+  营业成本:      {type: expense, is: 2, cf_out: 3}
+
+  税金及附加:                                {type: expense, is: 3, cf_out: 5}
+  消费税:                                    {type: expense, is: 3, is_sub: 4,  cf_out: 5}
+  营业税:                                    {type: expense, is: 3, is_sub: 5,  cf_out: 5}
+  城市维护建设税:                            {type: expense, is: 3, is_sub: 6,  cf_out: 5}
+  资源税:                                    {type: expense, is: 3, is_sub: 7,  cf_out: 5}
+  土地增值税:                                {type: expense, is: 3, is_sub: 8,  cf_out: 5}
+  城镇土地使用税、房产税、车船税、印花税:    {type: expense, is: 3, is_sub: 9,  cf_out: 5}
+  教育附加、矿产资源、排污费:                {type: expense, is: 3, is_sub: 10, cf_out: 5}
+
+  销售费用:              {type: expense, is: 11, cf_out: 6}
+  商品维修费:            {type: expense, is: 11, is_sub: 12, cf_out: 6}
+  广告费和业务宣传费:    {type: expense, is: 11, is_sub: 13, cf_out: 6}
+
+  管理费用:      {type: expense, is: 14, cf_in: 6, cf_out: 6}
+  开办费:        {type: expense, is: 14, is_sub: 15, cf_out: 6}
+  业务招待费:    {type: expense, is: 14, is_sub: 16, cf_out: 6}
+  研究费用:      {type: expense, is: 14, is_sub: 17, cf_out: 6}
+
+  财务费用:          {type: expense, is: 18, cf_in: 2, cf_out: 6}
+  # 利息收支走这个科目：它同时落在「财务费用」(18) 和「其中：利息费用」(19)
+  财务费用-利息:     {type: expense, is: 18, is_sub: 19, cf_in: 2, cf_out: 17}
+
+  投资收益:      {type: revenue, is: 20, cf_in: 9}
+
+  营业外收入:    {type: revenue, is: 22, cf_in: 2}
+  政府补助:      {type: revenue, is: 22, is_sub: 23, cf_in: 2}
+
+  营业外支出:                          {type: expense, is: 24, cf_out: 6}
+  坏账损失:                            {type: expense, is: 24, is_sub: 25}
+  无法收回的长期债券投资损失:          {type: expense, is: 24, is_sub: 26}
+  无法收回的长期股权投资损失:          {type: expense, is: 24, is_sub: 27}
+  自然灾害等不可抗力因素造成的损失:    {type: expense, is: 24, is_sub: 28, cf_out: 6}
+  税收滞纳金:                          {type: expense, is: 24, is_sub: 29, cf_out: 5}
+
+  所得税费用:    {type: expense, is: 31, cf_out: 5}

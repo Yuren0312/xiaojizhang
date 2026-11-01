@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>小虾记账 - 正在启动</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    color: #1f2329;
+    font-family: "Microsoft YaHei", "PingFang SC", -apple-system, sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+  .box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0 40px;
+  }
+  .logo {
+    width: 84px;
+    height: 84px;
+    border-radius: 20px;
+    object-fit: contain;
+    box-shadow: 0 6px 20px rgba(230, 92, 68, 0.16);
+  }
+  .name {
+    margin-top: 18px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+  .sub {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #8a9099;
+  }
+  .spinner {
+    margin-top: 26px;
+    width: 26px;
+    height: 26px;
+    border: 3px solid #f0ded9;
+    border-top-color: #e65c44;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status {
+    margin-top: 14px;
+    font-size: 13px;
+    color: #5c6470;
+    min-height: 20px;
+  }
+  .hint {
+    margin-top: 10px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #a0a6ae;
+    max-width: 380px;
+    display: none;
+  }
+  .hint.show { display: block; }
+  .foot {
+    position: fixed;
+    bottom: 14px;
+    font-size: 11px;
+    color: #b5bbc2;
+  }
+</style>
+</head>
+<body>
+  <div class="box">
+    <img class="logo" src="../assets/icon.png" alt="小虾记账" onerror="this.style.display='none'" />
+    <div class="name">小虾记账</div>
+    <div class="sub">小企业财税处理工具</div>
+    <div class="spinner"></div>
+    <div class="status" id="status">正在启动本地账务引擎…</div>
+    <div class="hint" id="hint">
+      首次启动需要初始化账务引擎，通常 20~40 秒；<br />
+      之后就快了。请勿关闭窗口。
+    </div>
+  </div>
+  <div class="foot">全部账务数据在本机处理，不上传云端</div>
+<script>
+  // 6 秒后仍停留在本页，说明后端启动较慢，给出更明确的提示，避免用户以为卡死
+  setTimeout(function () {
+    document.getElementById('status').textContent = '本地账务引擎初始化中…';
+    document.getElementById('hint').classList.add('show');
+  }, 6000);
+</script>
+</body>
+</html>

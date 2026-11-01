@@ -1,0 +1,25 @@
+{
+  "name": "xiaojizhang",
+  "version": "1.0.0",
+  "description": "小虾记账 - 小微企业智能代账桌面客户端",
+  "main": "electron/main.js",
+  "author": "小虾记账 Contributors",
+  "license": "MIT",
+  "homepage": "https://github.com/Yuren0312/xiaojizhang",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix web-ui run dev",
+    "build:frontend": "npm --prefix web-ui run build",
+    "build:backend": "python build_backend.py",
+    "prepare:app": "node scripts/prepare-build.js",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "npm run build:frontend && npm run prepare:app && electron-builder --win",
+    "dist:portable": "npm run build:frontend && npm run prepare:app && electron-builder --win portable",
+    "dist:all": "npm run build:frontend && npm run prepare:app && electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  }
+}

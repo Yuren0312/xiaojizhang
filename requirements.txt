@@ -1,0 +1,18 @@
+# 推荐 Python 3.11 / 3.12（3.13 上 PyMuPDF 的轮子目前存在兼容问题）
+# Windows 另需安装「Microsoft Visual C++ 2015-2022 Redistributable (x64)」，
+# 否则 PyMuPDF 会报 "DLL load failed while importing _extra"。
+
+# ── 引擎与解析 ──────────────────────────────
+PyMuPDF>=1.24,<2          # PDF 文本与坐标提取
+pdfplumber>=0.11          # 电子发票 PDF 解析（发票台账自动生成）
+openpyxl>=3.1             # xlsx 读写
+PyYAML>=6.0               # 规则文件
+
+# ── 后端 API ────────────────────────────────
+fastapi>=0.110            # REST API
+uvicorn>=0.29             # ASGI 服务器
+python-multipart>=0.0.9   # 文件上传表单解析
+
+# ── 测试 ─────────────────────────────────────
+pytest>=8.0               # 回归测试
+httpx>=0.27               # starlette TestClient 依赖（接口测试用）

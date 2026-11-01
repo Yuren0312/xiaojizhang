@@ -1,0 +1,8 @@
+# 统一换行：仓库内一律 LF，Windows 检出时按需转换
+* text=auto eol=lf
+
+# 二进制
+*.png binary
+*.ico binary
+*.xlsx binary
+*.jpg binary

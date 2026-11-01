@@ -1,0 +1,838 @@
+# 由 tools/build_template.py 从「输出 - 5月会计报表.xlsx」自动生成，请勿手改。
+# 行次 → {row: Excel行号, <列名>: Excel列字母}
+资产负债表:
+  date_cell: E3
+  date_kind: month_end
+  company_cell: A3
+  blank: ''
+  lines:
+    1:
+      row: 6
+      end: C
+      year_start: D
+    2:
+      row: 7
+      end: C
+      year_start: D
+    3:
+      row: 8
+      end: C
+      year_start: D
+    4:
+      row: 9
+      end: C
+      year_start: D
+    5:
+      row: 10
+      end: C
+      year_start: D
+    6:
+      row: 11
+      end: C
+      year_start: D
+    7:
+      row: 12
+      end: C
+      year_start: D
+    8:
+      row: 13
+      end: C
+      year_start: D
+    9:
+      row: 14
+      end: C
+      year_start: D
+    10:
+      row: 15
+      end: C
+      year_start: D
+    11:
+      row: 16
+      end: C
+      year_start: D
+    12:
+      row: 17
+      end: C
+      year_start: D
+    13:
+      row: 18
+      end: C
+      year_start: D
+    14:
+      row: 19
+      end: C
+      year_start: D
+    15:
+      row: 20
+      end: C
+      year_start: D
+    16:
+      row: 22
+      end: C
+      year_start: D
+    17:
+      row: 23
+      end: C
+      year_start: D
+    18:
+      row: 24
+      end: C
+      year_start: D
+    19:
+      row: 25
+      end: C
+      year_start: D
+    20:
+      row: 26
+      end: C
+      year_start: D
+    21:
+      row: 27
+      end: C
+      year_start: D
+    22:
+      row: 28
+      end: C
+      year_start: D
+    23:
+      row: 29
+      end: C
+      year_start: D
+    24:
+      row: 30
+      end: C
+      year_start: D
+    25:
+      row: 31
+      end: C
+      year_start: D
+    26:
+      row: 32
+      end: C
+      year_start: D
+    27:
+      row: 33
+      end: C
+      year_start: D
+    28:
+      row: 34
+      end: C
+      year_start: D
+    29:
+      row: 35
+      end: C
+      year_start: D
+    30:
+      row: 36
+      end: C
+      year_start: D
+    31:
+      row: 6
+      end: G
+      year_start: H
+    32:
+      row: 7
+      end: G
+      year_start: H
+    33:
+      row: 8
+      end: G
+      year_start: H
+    34:
+      row: 9
+      end: G
+      year_start: H
+    35:
+      row: 10
+      end: G
+      year_start: H
+    36:
+      row: 11
+      end: G
+      year_start: H
+    37:
+      row: 12
+      end: G
+      year_start: H
+    38:
+      row: 13
+      end: G
+      year_start: H
+    39:
+      row: 14
+      end: G
+      year_start: H
+    40:
+      row: 15
+      end: G
+      year_start: H
+    41:
+      row: 16
+      end: G
+      year_start: H
+    42:
+      row: 18
+      end: G
+      year_start: H
+    43:
+      row: 19
+      end: G
+      year_start: H
+    44:
+      row: 20
+      end: G
+      year_start: H
+    45:
+      row: 21
+      end: G
+      year_start: H
+    46:
+      row: 22
+      end: G
+      year_start: H
+    47:
+      row: 23
+      end: G
+      year_start: H
+    48:
+      row: 31
+      end: G
+      year_start: H
+    49:
+      row: 32
+      end: G
+      year_start: H
+    50:
+      row: 33
+      end: G
+      year_start: H
+    51:
+      row: 34
+      end: G
+      year_start: H
+    52:
+      row: 35
+      end: G
+      year_start: H
+    53:
+      row: 36
+      end: G
+      year_start: H
+利润表:
+  date_cell: B2
+  date_kind: month
+  company_cell: A2
+  blank: ''
+  lines:
+    1:
+      row: 4
+      ytd: C
+      month: D
+    2:
+      row: 5
+      ytd: C
+      month: D
+    3:
+      row: 6
+      ytd: C
+      month: D
+    4:
+      row: 7
+      ytd: C
+      month: D
+    5:
+      row: 8
+      ytd: C
+      month: D
+    6:
+      row: 9
+      ytd: C
+      month: D
+    7:
+      row: 10
+      ytd: C
+      month: D
+    8:
+      row: 11
+      ytd: C
+      month: D
+    9:
+      row: 12
+      ytd: C
+      month: D
+    10:
+      row: 13
+      ytd: C
+      month: D
+    11:
+      row: 14
+      ytd: C
+      month: D
+    12:
+      row: 15
+      ytd: C
+      month: D
+    13:
+      row: 16
+      ytd: C
+      month: D
+    14:
+      row: 17
+      ytd: C
+      month: D
+    15:
+      row: 18
+      ytd: C
+      month: D
+    16:
+      row: 19
+      ytd: C
+      month: D
+    17:
+      row: 20
+      ytd: C
+      month: D
+    18:
+      row: 21
+      ytd: C
+      month: D
+    19:
+      row: 22
+      ytd: C
+      month: D
+    20:
+      row: 23
+      ytd: C
+      month: D
+    21:
+      row: 24
+      ytd: C
+      month: D
+    22:
+      row: 25
+      ytd: C
+      month: D
+    23:
+      row: 26
+      ytd: C
+      month: D
+    24:
+      row: 27
+      ytd: C
+      month: D
+    25:
+      row: 28
+      ytd: C
+      month: D
+    26:
+      row: 29
+      ytd: C
+      month: D
+    27:
+      row: 30
+      ytd: C
+      month: D
+    28:
+      row: 31
+      ytd: C
+      month: D
+    29:
+      row: 32
+      ytd: C
+      month: D
+    30:
+      row: 33
+      ytd: C
+      month: D
+    31:
+      row: 34
+      ytd: C
+      month: D
+    32:
+      row: 35
+      ytd: C
+      month: D
+现金流量表:
+  date_cell: B3
+  date_kind: month
+  company_cell: A3
+  blank: ''
+  lines:
+    1:
+      row: 6
+      ytd: C
+      month: D
+    2:
+      row: 7
+      ytd: C
+      month: D
+    3:
+      row: 8
+      ytd: C
+      month: D
+    4:
+      row: 9
+      ytd: C
+      month: D
+    5:
+      row: 10
+      ytd: C
+      month: D
+    6:
+      row: 11
+      ytd: C
+      month: D
+    7:
+      row: 12
+      ytd: C
+      month: D
+    8:
+      row: 14
+      ytd: C
+      month: D
+    9:
+      row: 15
+      ytd: C
+      month: D
+    10:
+      row: 16
+      ytd: C
+      month: D
+    11:
+      row: 17
+      ytd: C
+      month: D
+    12:
+      row: 18
+      ytd: C
+      month: D
+    13:
+      row: 19
+      ytd: C
+      month: D
+    14:
+      row: 21
+      ytd: C
+      month: D
+    15:
+      row: 22
+      ytd: C
+      month: D
+    16:
+      row: 23
+      ytd: C
+      month: D
+    17:
+      row: 24
+      ytd: C
+      month: D
+    18:
+      row: 25
+      ytd: C
+      month: D
+    19:
+      row: 26
+      ytd: C
+      month: D
+    20:
+      row: 27
+      ytd: C
+      month: D
+    21:
+      row: 28
+      ytd: C
+      month: D
+    22:
+      row: 29
+      ytd: C
+      month: D
+利润表季报:
+  date_cell: B2
+  date_kind: month
+  company_cell: A2
+  blank: ''
+  lines:
+    1:
+      row: 4
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    2:
+      row: 5
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    3:
+      row: 6
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    4:
+      row: 7
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    5:
+      row: 8
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    6:
+      row: 9
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    7:
+      row: 10
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    8:
+      row: 11
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    9:
+      row: 12
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    10:
+      row: 13
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    11:
+      row: 14
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    12:
+      row: 15
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    13:
+      row: 16
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    14:
+      row: 17
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    15:
+      row: 18
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    16:
+      row: 19
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    17:
+      row: 20
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    18:
+      row: 21
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    19:
+      row: 22
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    20:
+      row: 23
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    21:
+      row: 24
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    22:
+      row: 25
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    23:
+      row: 26
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    24:
+      row: 27
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    25:
+      row: 28
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    26:
+      row: 29
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    27:
+      row: 30
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    28:
+      row: 31
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    29:
+      row: 32
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    30:
+      row: 33
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    31:
+      row: 34
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    32:
+      row: 35
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+现金流量表季报:
+  date_cell: B3
+  date_kind: month
+  company_cell: A3
+  blank: 0.0
+  lines:
+    1:
+      row: 6
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    2:
+      row: 7
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    3:
+      row: 8
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    4:
+      row: 9
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    5:
+      row: 10
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    6:
+      row: 11
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    7:
+      row: 12
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    8:
+      row: 14
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    9:
+      row: 15
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    10:
+      row: 16
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    11:
+      row: 17
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    12:
+      row: 18
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    13:
+      row: 19
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    14:
+      row: 21
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    15:
+      row: 22
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    16:
+      row: 23
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    17:
+      row: 24
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    18:
+      row: 25
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    19:
+      row: 26
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    20:
+      row: 27
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    21:
+      row: 28
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G
+    22:
+      row: 29
+      ytd: C
+      q1: D
+      q2: E
+      q3: F
+      q4: G

@@ -1,0 +1,149 @@
+# 银行流水摘要 → 对方科目
+#
+# 匹配规则：按 match 关键词在「摘要 + 对方户名」里做子串查找，自上而下first-match。
+# 匹配不上的流水不会被猜测入账——程序会列出待归类清单并报错。
+
+bank_rules:
+
+  # ---- 收入类（主营业务收入/服务收入）----
+  - match: 货款
+    account: 营业收入
+    note: 销售货款入账
+  - match: 销售款
+    account: 营业收入
+    note: 销售收入入账
+  - match: 营业收入
+    account: 营业收入
+    note: 营业收入入账
+  - match: 主营收入
+    account: 营业收入
+    note: 主营业务收入入账
+  - match: 服务收入
+    account: 营业收入
+    note: 服务费收入入账
+
+  - match: 微信支付认证
+    account: 财务费用-利息
+    note: 财付通商户认证小额打款，计入利息收入（冲减财务费用）
+
+  - match: 认证
+    account: 财务费用-利息
+    note: 企业实名认证/打款认证等小额验证款
+
+  - match: 验证
+    account: 财务费用-利息
+    note: 企业实名验证等小额验证款
+
+  - match: 开发者
+    account: 财务费用-利息
+    note: 开发者平台验证打款
+
+  - match: 财付通
+    account: 财务费用-利息
+    note: 财付通往来
+
+  - match: 腾讯
+    account: 财务费用-利息
+    note: 腾讯平台验证小额打款
+
+  - match: 华为
+    account: 财务费用-利息
+    note: 华为/支付宝验证小额打款
+
+  - match: 支付宝
+    account: 财务费用-利息
+    note: 支付宝验证/转账小额
+
+  - match: 七牛云
+    account: 财务费用-利息
+    note: 七牛云验证小额打款
+
+  - match: 银联
+    account: 财务费用-利息
+    note: 银联商务验证/结算小额
+
+  - match: 付科技
+    account: 财务费用-利息
+    note: 支付科技验证小额打款（PDF解析长名截断兜底匹配）
+
+  - match: B2B在线支付
+    account: 预付账款
+    note: 阿里云 B2B 在线支付（云服务预付充值）
+
+  - match: TLB1801
+    account: 其他应付款-预付报销款
+    note: 员工报销垫付（TLB 报销单号）
+
+  - match: 利息
+    account: 财务费用-利息
+    note: 存款利息 / 贷款利息
+
+  - match: 手续费
+    account: 财务费用
+    note: 银行手续费
+
+  - match: 惠享服务
+    account: 财务费用
+    note: 银行增值服务费
+
+  - match: 续费
+    account: 财务费用
+    note: 服务续费/年费
+
+  - match: "2026.6"
+    account: 财务费用
+    note: 银行月度账户管理费
+
+  - match: 理财
+    account: 短期投资
+    note: 理财申购 / 赎回
+
+  - match: 结构性存款
+    account: 短期投资
+
+  - match: 报销
+    account: 管理费用
+    note: 报销款
+
+  - match: 劳务费
+    account: 管理费用
+    note: 劳务费
+
+  - match: 注册退款
+    account: 管理费用
+    note: 注册费退款
+
+  - match: 注册
+    account: 管理费用
+    note: 平台/小程序注册费
+
+  - match: 阿里云
+    account: 营业成本
+    note: 云服务费
+
+  - match: 服务费
+    account: 营业成本
+
+  - match: 工资
+    account: 应付职工薪酬
+
+  - match: 社保
+    account: 应付职工薪酬
+
+  - match: 税
+    account: 应交税费
+
+  - match: 股东A
+    account: 实收资本（或股本）
+    note: 股东注资/往来款
+
+  - match: 原路返回
+    account: 营业外收入
+    note: 资金原路退回
+
+  - match: 户名误
+    account: 营业外收入
+    note: 户名错误退款
+
+# 现金及现金等价物科目（对账单的借贷方向据此判断流入/流出）
+cash_account: 货币资金

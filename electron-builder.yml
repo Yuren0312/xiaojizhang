@@ -1,0 +1,70 @@
+# ============================================================
+# 小虾记账 - Electron Builder 配置
+# 产物：Windows 安装包（NSIS）+ 便携版（免安装）
+# ============================================================
+
+appId: com.yuni.xiaojizhang
+productName: 小虾记账
+copyright: Copyright © 2026 小虾记账 Contributors
+
+# 版本号取自 package.json 的 version（electron-builder 25 根配置不接受 version 键）
+
+directories:
+  output: release
+  buildResources: assets
+
+# ---- Windows ----
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: icon.ico
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+  # 请求执行级别：最低权限，无需管理员
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: icon.ico
+  uninstallerIcon: icon.ico
+  installerHeaderIcon: icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 小虾记账
+  uninstallDisplayName: 小虾记账 ${version}
+  deleteAppDataOnUninstall: false          # 卸载不删账套数据
+  license: LICENSE
+
+portable:
+  artifactName: "${productName}-${version}-便携版.${ext}"
+
+# ---- 打包内容 ----
+files:
+  - dist/**/*            # 前端构建产物（由 scripts/prepare-build.js 复制到此）
+  - electron/**/*
+  - assets/icon.ico      # 窗口图标（main.js 按 asar 根 assets/ 读取）
+  - assets/icon.png
+  - "!**/*.map"
+  - "!**/.DS_Store"
+  - "!electron/**/*.orig"       # 修坑前的原始备份，不进包
+  - "!electron/**/*.bak-*"
+  - "!electron/*.log"
+
+# Python 引擎以未压缩目录形式随包分发（asar 内的 exe 无法直接执行）
+extraResources:
+  - from: backend-server/server
+    to: backend
+    filter:
+      - "**/*"
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+
+# ---- 元信息 ----
+# author / license / homepage 由 package.json 提供；
+# electron-builder 25 的根配置 schema 不接受这三个键，写在这里会直接报 unknown property。
