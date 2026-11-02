@@ -159,10 +159,33 @@ export function clearPeriodCache(period: AccountingPeriod): number {
   return count;
 }
 
+export function getInputDirtyKey(period: AccountingPeriod): string {
+  return lsKey(period, 'input', 'dirty');
+}
+
+/** 标记该账期输入资料已变更，服务器上的旧结果已过期。
+ *
+ * 结果页不再无条件重算，而是先查服务器已有结果；没有这个标记就会把旧结果当新结果展示。
+ * 计算成功后才清除，失败则保留，保证下次进入仍会重算。 */
+export function markInputDirty(period: AccountingPeriod): void {
+  setItem(getInputDirtyKey(period), true);
+}
+
+export function isInputDirty(period: AccountingPeriod): boolean {
+  return getItem<boolean>(getInputDirtyKey(period), false) === true;
+}
+
+export function clearInputDirty(period: AccountingPeriod): void {
+  removeItem(getInputDirtyKey(period));
+}
+
 /** 输入资料变更后失效结果缓存（localStorage 结果键 + IndexedDB 结果 blob）。
  *
  * 上传/删除/保存输入资料后调用，避免进入结果页时静默展示基于旧输入的缓存结果。 */
 export async function invalidateResultCache(period: AccountingPeriod): Promise<void> {
+  // 0) 标记输入已变更：结果页据此跳过「服务器已有结果」判断，直接重算
+  markInputDirty(period);
+
   // 1) localStorage：lbs:{period}:result:*（files / generatedAt）
   const prefix = lsKey(period, 'result');
   const keysToRemove: string[] = [];

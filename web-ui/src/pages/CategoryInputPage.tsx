@@ -20,7 +20,8 @@ import FilePreview from '../components/ui/FilePreview';
 import type { StoredFile, MissingFlag, ModuleId } from '../types';
 
 const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls'];
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
+// 与后端 server.py MAX_UPLOAD_SIZE=50MB 对齐（前端先拦，后端是权威）
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 const CategoryInputPage: React.FC = () => {
   const { module: moduleId } = useParams<{ module: string }>();
@@ -87,7 +88,7 @@ const CategoryInputPage: React.FC = () => {
       return `不支持"${ext}"格式，支持：${ALLOWED_EXTENSIONS.join(', ')}`;
     }
     if (file.size > MAX_FILE_SIZE) {
-      return '文件过大（最大20MB），请压缩后上传';
+      return `文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB > 50MB 限制），请压缩后上传`;
     }
     return null;
   };
@@ -136,8 +137,10 @@ const CategoryInputPage: React.FC = () => {
             backendName,
             uploadedAt: new Date().toISOString(),
           } as StoredFile;
-        } catch {
-          addToast({ type: 'error', message: `上传失败: ${file.name}` });
+        } catch (err) {
+          // 暴露真实错误（网络错误/服务端 4xx 详情）便于排查
+          const msg = err instanceof Error ? err.message : String(err);
+          addToast({ type: 'error', message: `上传失败: ${file.name}（${msg}）` });
           return null;
         } finally {
           setUploadProgress((prev) => {
@@ -398,7 +401,7 @@ const CategoryInputPage: React.FC = () => {
           支持 PDF / JPG / PNG / Excel 批量上传
         </p>
         <p className="text-xs text-text-disabled">
-          （单文件≤20MB，可批量上传）
+          （单文件≤50MB，可批量上传）
         </p>
         <input
           ref={fileInputRef}

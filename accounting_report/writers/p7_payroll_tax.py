@@ -137,7 +137,8 @@ def _calc_tax(cumulative_taxable: Decimal) -> Decimal:
         prev_threshold = upper if upper is not None else prev_threshold
         if remaining <= ZERO:
             break
-    return tax
+    # 税额量化到分，避免多位小数写入扣缴明细表
+    return money(tax)
 
 
 # ── Sheet 1: 个税扣缴明细 ───────────────────────────────────────────
@@ -177,7 +178,7 @@ def _payroll_tax_detail(ws, employees: list, year: int, month: int,
         "序号", "姓名", "身份证号",
         "本期收入", "本期免税收入",
         "基本养老保险", "基本医疗保险", "失业保险", "住房公积金",
-        "累计收入", "累计减除费用\n(5000×月数)",
+        "累计收入", "累计减除费用\n(5000×累计月数)",
         "累计专项扣除", "累计专项附加扣除",
         "累计应纳税所得额", "累计应扣缴税额",
         "累计已预扣税额", "本期应补（退）税额",
@@ -209,7 +210,16 @@ def _payroll_tax_detail(ws, employees: list, year: int, month: int,
             # 累计数据
             cumulative_income = money(emp.get("cumulative_income",
                                               monthly_income))
-            cumulative_deduction = MONTHLY_DEDUCTION * Decimal(month)  # 累计减除费用
+            # 累计减除费用：减除月数必须与累计收入覆盖的月数一致
+            # - emp 提供了 cumulative_income（含本期）时，按其覆盖月数
+            #   cumulative_months 计算（缺省 1 个月，宁可少减也不虚减）
+            # - 只有单月收入（缺 cumulative_income）时，仅减除 5000×1，
+            #   避免新员工/年中启用时按自然月号高估减除、把 taxable 算成负数
+            if "cumulative_income" in emp and emp.get("cumulative_income") not in (None, ""):
+                cumulative_months = int(emp.get("cumulative_months", 1) or 1)
+            else:
+                cumulative_months = 1
+            cumulative_deduction = MONTHLY_DEDUCTION * Decimal(cumulative_months)
             cumulative_special_deduct = money(emp.get(
                 "cumulative_special_deduct",
                 monthly_special_deduct))
@@ -275,7 +285,9 @@ def _payroll_tax_detail(ws, employees: list, year: int, month: int,
     row += 2
     notes = [
         "计算逻辑说明：",
-        "• 累计应纳税所得额 = 累计收入 − 累计减除费用(5000×月数) − 累计专项扣除 − 累计专项附加扣除",
+        "• 累计应纳税所得额 = 累计收入 − 累计减除费用(5000×累计月数) − 累计专项扣除 − 累计专项附加扣除",
+        "• 累计减除费用月数与累计收入覆盖月数一致：emp 提供 cumulative_months 时按其取值（缺省 1 个月）；",
+        "  只有单月收入（未提供累计收入）时按 5000×1 减除，避免新员工/年中启用时虚减、税算错。",
         "• 累计应扣缴税额 = 累计应纳税所得额 × 预扣率 − 速算扣除数（居民个人工资薪金累计预扣法）",
         "• 本期应补（退）税额 = 累计应扣缴税额 − 累计已预扣缴税额",
         "",
@@ -418,6 +430,7 @@ def generate(
                 "unemployment": Decimal,        # 失业保险（个人部分）
                 "housing_fund": Decimal,        # 住房公积金（个人部分）
                 "cumulative_income": Decimal,   # 累计收入（含本期）
+                "cumulative_months": int,       # 累计收入覆盖的月数（累计减除费用 = 5000×月数；缺省 1）
                 "cumulative_special_deduct": Decimal,  # 累计专项扣除
                 "cumulative_special_additional": Decimal,  # 累计专项附加扣除
                 "cumulative_other_deduct": Decimal,       # 累计其他扣除（如企业年金）

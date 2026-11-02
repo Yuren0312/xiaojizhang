@@ -208,18 +208,23 @@ export interface ComputeTaskStatus {
   error?: string;
 }
 
-/** 创建异步计算任务（后端后台线程执行，返回 task_id 供轮询真实进度） */
+/** 创建异步计算任务（后端后台线程执行，返回 task_id 供轮询真实进度）。
+ *
+ * externalSignal：调用方可传入 AbortController.signal 以支持中途取消
+ * （账期切换/重新生成时终止在途请求），内部超时与外部信号合并。 */
 export async function startComputeTask(
   year: number,
   month: number,
   entityType: 'corp' | 'individual' = 'corp',
-  signal?: AbortSignal,
+  externalSignal?: AbortSignal,
 ): Promise<{ task_id: string }> {
   const res = await fetch(`${API_BASE}/api/compute/task`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ year, month, entity_type: entityType }),
-    signal: signal || AbortSignal.timeout(30000),
+    signal: externalSignal
+      ? AbortSignal.any([AbortSignal.timeout(30000), externalSignal])
+      : AbortSignal.timeout(30000),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -229,9 +234,11 @@ export async function startComputeTask(
 }
 
 /** 轮询任务进度（0-100 真实进度 + 阶段文案） */
-export async function getComputeTask(taskId: string, signal?: AbortSignal): Promise<ComputeTaskStatus> {
+export async function getComputeTask(taskId: string, externalSignal?: AbortSignal): Promise<ComputeTaskStatus> {
   const res = await fetch(`${API_BASE}/api/compute/task/${encodeURIComponent(taskId)}`, {
-    signal: signal || AbortSignal.timeout(30000),
+    signal: externalSignal
+      ? AbortSignal.any([AbortSignal.timeout(30000), externalSignal])
+      : AbortSignal.timeout(30000),
   });
   if (!res.ok) {
     throw new Error(`查询任务失败 (${res.status})`);

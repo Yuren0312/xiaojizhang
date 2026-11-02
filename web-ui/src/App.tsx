@@ -18,9 +18,12 @@ const PageLoading: React.FC = () => (
   </div>
 );
 
+// 子路径部署（如 /app/）时路由必须带 basename，否则跳转与刷新都会掉到站点根路径 404
+const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
+
 const App: React.FC = () => {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={BASENAME}>
       <div className="min-h-screen flex flex-col bg-gray-50">
         <Navbar />
         <main className="flex-1">

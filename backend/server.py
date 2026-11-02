@@ -194,6 +194,7 @@ async def upload_file(
         "bank": "银行对账单",
         "payroll": "工资社保",
         "company-info": "企业信息",
+        "tax-adjust": "税务调整",
     }
 
     if module not in module_dirs:
@@ -508,6 +509,7 @@ async def delete_input_file(period: str, module: str, filename: str):
         "bank": "银行对账单",
         "payroll": "工资社保",
         "company-info": "企业信息",
+        "tax-adjust": "税务调整",
     }
     if module not in module_dirs:
         raise HTTPException(400, f"不支持的模块: {module}")

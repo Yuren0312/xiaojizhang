@@ -92,6 +92,7 @@ class FullResult:
     output7_payroll_tax: Path | None = None   # 个税扣缴明细
     output8_vouchers: Path | None = None      # 记账凭证
     output9_trial_balance: Path | None = None  # 试算平衡表
+    output10_tax_filing: list[Path] = field(default_factory=list)  # 税局报送格式（资产负债表/利润表）
     prior: PriorPeriod | None = None          # 本期使用的上期数据（月链串联用）
     report: ReportSet | None = None           # 本期报表
     errors: list[str] = field(default_factory=list)
@@ -621,10 +622,20 @@ def run_workbody(
         prior = _find_prior_from_report_pdfs(year, month, query.warnings)
 
     if prior is None:
+        # 最后一级兜底：科目余额表自带期初余额列，比报表 PDF 更可靠。
+        # 不接这条时单月补跑/首月导入会退化成期初全 0，期末只剩本期净变化。
+        prior = compute.prior_from_trial_balance(query.trial_balances, year, month)
+        if prior is not None:
+            query.warnings.append(
+                "未找到上月报表，已用科目余额表的期初余额作为期初。"
+                "若需年初余额栏，请补充上期报表。"
+            )
+
+    if prior is None:
         py, pm = (year, month - 1) if month > 1 else (year - 1, 12)
         prior = PriorPeriod(year=py, month=pm)
         query.warnings.append(
-            "未找到上月报表，使用零余额作为期初。"
+            "未找到上月报表，科目余额表也无期初余额，使用零余额作为期初。"
             "首月报表期初余额可能不准确。"
         )
 
@@ -702,6 +713,8 @@ def run_chain(
     output_dir: Path | str | None = None,
     entity_type: str = "corp",
     initial_prior: PriorPeriod | None = None,
+    company_name: str | None = None,
+    tax_no: str | None = None,
 ) -> list[FullResult]:
 
     """连续多期运行：每期直接用上期 build 输出构造下期 prior，
@@ -757,12 +770,15 @@ def run_chain(
         # 否则 output9 试算平衡表期初 = 本期期末（双重累计）、勾稽 checks 用错期初，
         # 导致校验恒失败（OPT：run_chain prior 链污染）
         _emit_outputs(result, query, report, new_prior, year, month,
-                     input_dir, output_dir, entity_type)
+                     input_dir, output_dir, entity_type,
+                     company_name=company_name, tax_no=tax_no)
         results.append(result)
     return results
 
 
-def _cleanup_stale_outputs(output_dir: Path, year: int, month: int, label_kw: str) -> None:
+def _cleanup_stale_outputs(
+    output_dir: Path, year: int, month: int, label_kw: str, suffix: str = ".xlsx",
+) -> None:
     """清理同账期的旧版输出，保证每类输出只保留最新一份。
 
     场景：同一账期先跑过模板版（缺发票/工资/资产数据时文件名带 [模板]），
@@ -772,7 +788,7 @@ def _cleanup_stale_outputs(output_dir: Path, year: int, month: int, label_kw: st
     仅清理引擎输出，绝不触碰输入目录。
     """
     prefix = f"{year:04d}-{month:02d}"
-    for f in output_dir.glob(f"{prefix}*{label_kw}*.xlsx"):
+    for f in output_dir.glob(f"{prefix}*{label_kw}*{suffix}"):
         try:
             f.unlink()
         except OSError:
@@ -785,6 +801,8 @@ def _emit_outputs(
     year: int, month: int,
     input_dir: Path, output_dir: Path, entity_type: str,
     progress=None,
+    company_name: str | None = None,
+    tax_no: str | None = None,
 ) -> None:
     """输出 1-8（从 run_full 抽出的公共部分，供 run_chain 复用）"""
     def _report(pct: int, msg: str) -> None:
@@ -875,6 +893,20 @@ def _emit_outputs(
         except Exception as e:
             result.errors.append(f"输出分析简报失败：{e}")
 
+    # === 税务调整项（纳税调整/弥补亏损/减免/已预缴）===
+    # 与 p5、p6 共用：p5 取「已缴增值税额」，p6 取其余各项。
+    # 三本台账没有统一格式，改为会计在前端录入后落到
+    # 输入/<账期>/_tax-adjust_补充说明.txt，这里只负责读。
+    tax_adjust = _try_load_tax_adjust(input_dir, year, month)
+    if tax_adjust.source and tax_adjust.problems:
+        for _p in tax_adjust.problems[:5]:
+            query.warnings.append(f"税务调整项：{_p}")
+    elif not tax_adjust.source:
+        query.warnings.append(
+            "税务调整项未录入：纳税调增/调减、弥补亏损、减免税额、已预缴税额均按 0 计，"
+            "所得税申报表可能不准，请在「税务调整」页补录"
+        )
+
     # === 输出5：增值税申报底稿（需要报表数据） ===
     if p5_vat_declaration and report is not None:
         _report(80, "正在生成增值税申报底稿...")
@@ -885,6 +917,7 @@ def _emit_outputs(
                 report_set=report,
                 year=year, month=month,
                 invoice_data=invoice_data,
+                adjust=tax_adjust,
                 out_path=output_dir,
             )
             result.output5_vat = out5
@@ -907,6 +940,7 @@ def _emit_outputs(
                 entity_type=entity_type,
                 asset_total=asset_total,
                 employee_count=employee_count,
+                adjust=tax_adjust,
                 out_path=output_dir,
             )
             result.output6_income_tax = out6
@@ -962,6 +996,21 @@ def _emit_outputs(
         except Exception as e:
             result.errors.append(f"输出试算平衡表失败：{e}")
 
+    # === 输出10：电子税务局报送格式（会小企01/02表） ===
+    # 用税局模板当底稿填数，产出可原样上传的单表文件；
+    # 若改成重排版式，行次/表头/所属期格式必然对不上电子税务局校验。
+    if report is not None:
+        try:
+            from .writers import p10_tax_filing
+            _cleanup_stale_outputs(output_dir, year, month, "税局报送", suffix=".xls")
+            result.output10_tax_filing = p10_tax_filing.write_tax_filing(
+                report, output_dir,
+                company_name=company_name or config.COMPANY_NAME,
+                tax_no=tax_no if tax_no is not None else config.TAX_NO,
+            )
+        except Exception as e:
+            result.errors.append(f"输出电子税务局报送表失败：{e}")
+
     _report(100, "全部输出完成")
     return
 
@@ -972,6 +1021,8 @@ def run_full(
     output_dir: Path | str | None = None,
     entity_type: str = "corp",  # "corp" | "individual"
     progress=None,  # Callable[[int, str], None]：进度回调（0-100 + 阶段文案）
+    company_name: str | None = None,  # 纳税人名称，税局报送表头用；None 取 config
+    tax_no: str | None = None,        # 纳税人识别号，同上
 ) -> FullResult:
     """运行完整管线：Query → WorkBody → 输出 1/2/3/4"""
     input_dir = Path(input_dir) if input_dir else config.INPUT_DIR
@@ -1006,167 +1057,15 @@ def run_full(
     result.report = report
     result.prior = prior
 
-    # === 输出3：标准财务报表（有分录才出） ===
-    if report is not None and query.journal_entries:
-        _report(50, "正在校验勾稽关系并输出标准报表...")
-        out3 = output_dir / f"{year:04d}-{month:02d} 会计报表.xlsx"
-        try:
-            from .engine import checks as check_mod
-            passed = check_mod.run(report, prior, query.journal_entries)
-        except check_mod.ReconciliationError as e:
-            # 勾稽不过：暴露原因到 warnings，不让用户拿到一张"看似正常"的不平表
-            query.warnings.append(f"⚠️ 勾稽校验未通过：{e}")
-            passed = []
-        except Exception as e:  # noqa: BLE001
-            query.warnings.append(f"勾稽校验异常：{e}")
-            passed = []
-
-        try:
-            xlsx_writer.write(report, out3)
-            result.output3_report = out3
-        except Exception as e:
-            result.errors.append(f"输出标准报表失败：{e}")
-
-    # === 输出1：银行对账报告（无条件生成） ===
-    if p1_bank_reconciliation:
-        try:
-            _report(58, "正在生成银行对账报告...")
-            out1 = output_dir / f"{year:04d}-{month:02d} 银行对账报告.xlsx"
-            # 从分录中提取银行科目的交易作为账面数据
-            book_bank_entries = [
-                je for je in query.journal_entries
-                if '银行存款' in str(je.debit) or '银行存款' in str(je.credit)
-                or '货币资金' in str(je.debit) or '货币资金' in str(je.credit)
-            ]
-            p1_bank_reconciliation.write_bank_reconciliation(
-                query.bank_txns, book_bank_entries, out1,
-                opening_cash=report.bs_end.get(1) if report is not None else (
-                    prior.bs_end.get(1) if prior else None)
-            )
-            result.output1_reconciliation = out1
-        except Exception as e:
-            result.errors.append(f"输出银行对账报告失败：{e}")
-
-    # === 输出2：全账务核算汇总表 ===
-    if p2_account_summary:
-        _report(66, "正在生成核算汇总表...")
-        try:
-            out2 = output_dir / f"{year:04d}-{month:02d} 核算汇总表.xlsx"
-            p2_account_summary.write_account_summary(
-                query.trial_balances, query.ledger_all, out2,
-                period_end=f"{year:04d}-{month:02d}",
-            )
-            result.output2_summary = out2
-        except Exception as e:
-            result.errors.append(f"输出核算汇总表失败：{e}")
-
-    # === 输出4：会计业务分析简报（需要报表） ===
-    if p4_analysis_brief and report is not None:
-        _report(74, "正在生成分析简报...")
-        try:
-            analysis_data = analysis.analyze(
-                query.bank_txns, query.journal_entries, report, query.trial_balances
-            )
-            result.analysis_data = analysis_data
-            out4 = output_dir / f"{year:04d}-{month:02d} 分析简报.xlsx"
-            p4_analysis_brief.write_analysis_brief(
-                report, query.bank_txns, query.voucher_entries,
-                query.trial_balances, out4
-            )
-            result.output4_analysis = out4
-        except Exception as e:
-            result.errors.append(f"输出分析简报失败：{e}")
-
-    # === 输出5：增值税申报底稿（需要报表数据） ===
-    if p5_vat_declaration and report is not None:
-        _report(80, "正在生成增值税申报底稿...")
-        try:
-            _cleanup_stale_outputs(output_dir, year, month, "增值税")
-            # 尝试读取发票台账
-            invoice_data = _try_load_invoice_ledger(input_dir, year, month)
-            out5, vat_is_template = p5_vat_declaration.generate(
-                report_set=report,
-                year=year, month=month,
-                invoice_data=invoice_data,
-                out_path=output_dir,
-            )
-            result.output5_vat = out5
-            if vat_is_template:
-                query.warnings.append(
-                    "输出5: 增值税申报底稿为模板输出（缺少发票台账数据源）"
-                )
-        except Exception as e:
-            result.errors.append(f"输出增值税申报底稿失败：{e}")
-
-    # === 输出6：所得税预缴底稿（需要报表数据） ===
-    if p6_income_tax_declaration and report is not None:
-        _report(86, "正在生成企业所得税预缴底稿...")
-        try:
-            asset_total, employee_count = _try_load_asset_employee(input_dir)
-            _cleanup_stale_outputs(output_dir, year, month, "预缴底稿")
-            out6, inc_tax_is_template = p6_income_tax_declaration.generate(
-                report_set=report,
-                year=year, month=month,
-                entity_type=entity_type,
-                asset_total=asset_total,
-                employee_count=employee_count,
-                out_path=output_dir,
-            )
-            result.output6_income_tax = out6
-            if inc_tax_is_template:
-                query.warnings.append(
-                    "输出6: 所得税预缴底稿为模板输出（缺少资产台账/员工名册数据源）"
-                )
-        except Exception as e:
-            result.errors.append(f"输出所得税预缴底稿失败：{e}")
-
-    # === 输出7：个税扣缴明细表（独立于报表） ===
-    if p7_payroll_tax:
-        _report(92, "正在生成个税扣缴明细表...")
-        try:
-            # 尝试读取工资表
-            employees = _try_load_payroll(input_dir, year, month)
-            _cleanup_stale_outputs(output_dir, year, month, "个税")
-            out7, pr_tax_is_template = p7_payroll_tax.generate(
-                year=year, month=month,
-                employees=employees,
-                out_path=output_dir,
-            )
-            result.output7_payroll_tax = out7
-            if pr_tax_is_template:
-                query.warnings.append(
-                    "输出7: 个税扣缴明细表为模板输出（缺少员工工资数据源）"
-                )
-        except Exception as e:
-            result.errors.append(f"输出个税扣缴明细表失败：{e}")
-
-    # === 输出8：记账凭证（从分录生成，产品闭环补齐） ===
-    if query.journal_entries:
-        _report(96, "正在生成记账凭证...")
-        try:
-            from .writers import p8_vouchers
-            out8 = p8_vouchers.generate(
-                query.journal_entries, year, month, out_path=output_dir
-            )
-            result.output8_vouchers = out8
-        except Exception as e:
-            result.errors.append(f"输出记账凭证失败：{e}")
-
-    # === 输出9：试算平衡表（会计核心文件，从分录汇总生成） ===
-    # 门控用「有分录」而非「有科目余额表」：借贷发生额直接来自分录，
-    # 科目余额表仅补充科目编码/名称。只传银行对账单+业务事项时也应出表。
-    if query.journal_entries:
-        try:
-            from .writers import p9_trial_balance
-            out9 = p9_trial_balance.generate(
-                query.journal_entries, query.trial_balances, prior, year, month,
-                out_path=output_dir,
-            )
-            result.output9_trial_balance = out9
-        except Exception as e:
-            result.errors.append(f"输出试算平衡表失败：{e}")
-
-    _report(100, "全部输出完成")
+    # 输出 1-10 统一走 _emit_outputs，与 run_chain 共用同一段实现。
+    # 此前 run_full 内联了一份等价代码，加新输出时两边都要改、极易漏改。
+    _emit_outputs(
+        result, query, report, prior, year, month,
+        input_dir, output_dir, entity_type,
+        progress=progress,
+        company_name=company_name,
+        tax_no=tax_no,
+    )
     return result
 
 
@@ -1228,6 +1127,26 @@ def _try_load_invoice_ledger(input_dir: Path, year: int, month: int) -> dict | N
     except Exception:
         pass
     return None
+
+
+def _try_load_tax_adjust(input_dir: Path, year: int, month: int):
+    """读取当期税务调整项（纳税调增/调减、弥补亏损、减免、已预缴）。
+
+    查找 ``输入/<账期>/税务调整.json`` 或 ``_tax-adjust_补充说明.txt``。
+    两者都没有时返回空白对象（各项按 0 计），并记 ``source`` 为空供上层告警。
+    """
+    from .tax_adjust import load as _load_adjust
+
+    period_dir = Path(input_dir) / f"{year:04d}-{month:02d}"
+    try:
+        return _load_adjust(period_dir)
+    except Exception:
+        # 解析失败不该让整条流水线挂掉：税金按 0 计 + 上层告警
+        from .tax_adjust import TaxAdjust
+        bad = TaxAdjust()
+        bad.problems.append("税务调整项读取失败，已按 0 计")
+        bad.source = "（读取失败）"
+        return bad
 
 
 def _try_load_asset_employee(input_dir: Path) -> tuple:

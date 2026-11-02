@@ -61,6 +61,33 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     textLabel: '企业信息变更说明',
     textPlaceholder: '描述变更内容，例如：\n变更日期：2026-07-15\n变更事项：银行账户地址变更\n变更后信息：XX市XX区XX路XX号\n\n建议格式：变更日期 + 变更事项 + 变更后信息',
   },
+  {
+    id: 'tax-adjust',
+    icon: '🧮',
+    title: '税务调整项录入',
+    subtitle: '税务调整',
+    description: '纳税调增/调减、弥补亏损、减免税额、已预缴税额',
+    route: '/input/tax-adjust',
+    uploadHint: '如有预缴税款台账/纳税调整台账，可上传备查（PDF/Excel/图片）',
+    uploadAccept: '.pdf,.jpg,.jpeg,.png,.xlsx,.xls',
+    textLabel: '税务调整金额（每行一条，没写的项目按 0 计）',
+    textPlaceholder: [
+      '# 本年累计数。不涉及的项目留空即可，程序按 0 计。',
+      '# 支持冒号、等号或空格分隔，金额可带千分位与 ¥，负数额用括号。',
+      '',
+      '纳税调增额：0',
+      '纳税调减额：0',
+      '弥补以前年度亏损：0',
+      '其他减免所得税额：0',
+      '已预缴所得税额：0',
+      '已缴增值税额：0',
+      '',
+      '# 常见调增：业务招待费超标、广告费超标、税收滞纳金与罚款、',
+      '#           职工福利费/教育经费超标、无票支出。',
+      '# 常见调减：免税收入、加计扣除（研发费用等）。',
+      '# 不填这些数，所得税申报表的应纳税所得额就是错的 —— 别省略。',
+    ].join('\n'),
+  },
 ];
 
 export function getModuleById(id: string): ModuleDefinition | undefined {

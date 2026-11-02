@@ -6,6 +6,9 @@
 PyMuPDF>=1.24,<2          # PDF 文本与坐标提取
 pdfplumber>=0.11          # 电子发票 PDF 解析（发票台账自动生成）
 openpyxl>=3.1             # xlsx 读写
+xlrd==2.0.2               # .xls 读取（含 formatting_info，税局模板样式还原必需）
+xlwt==1.3.0               # .xls 写入（电子税务局报表只收 BIFF8）
+xlutils>=2.0              # xlrd → xlwt 桥接，按模板原样式复制
 PyYAML>=6.0               # 规则文件
 
 # ── 后端 API ────────────────────────────────

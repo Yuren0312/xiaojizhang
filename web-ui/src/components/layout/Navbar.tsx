@@ -1,25 +1,56 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import { Settings, FolderArchive } from 'lucide-react';
-import { listArchived } from '../../services/api';
+import { listArchived, listPeriods } from '../../services/api';
 
 interface NavbarProps {
   title?: string;
 }
 
+const NEW_PERIOD_OPTION = '__new_period__';
+
 const Navbar: React.FC<NavbarProps> = ({ title = '小虾记账' }) => {
-  const { currentPeriod, availablePeriods, setCurrentPeriod, setShowSettings } = useAppStore();
+  const { currentPeriod, availablePeriods, setCurrentPeriod, mergeAvailablePeriods, addToast, setShowSettings } = useAppStore();
   const [archivedCount, setArchivedCount] = useState(0);
+  const location = useLocation();
 
   useEffect(() => {
     listArchived()
       .then((data) => setArchivedCount(data.archived.length))
       .catch(() => {});
-  }, []);
+  }, [location.pathname]);
+
+  // 合并后端 /api/periods 发现的账期（含仅有输出/输入目录但本地无缓存键的账期）
+  useEffect(() => {
+    listPeriods()
+      .then((data) => mergeAvailablePeriods(data.map((p) => p.period)))
+      .catch(() => {});
+  }, [mergeAvailablePeriods]);
 
   const handlePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setCurrentPeriod(e.target.value);
+    const value = e.target.value;
+    if (value === NEW_PERIOD_OPTION) {
+      const input = window.prompt('输入新账期（格式 YYYY-MM，例如 2026-09）：');
+      if (input && /^\d{4}-\d{2}$/.test(input.trim())) {
+        const period = input.trim();
+        // 校验合理性（年份/月份），不合法时提示
+        const [, , m] = period.match(/^(\d{4})-(\d{2})$/) || [];
+        const month = parseInt(m, 10);
+        if (month >= 1 && month <= 12) {
+          setCurrentPeriod(period);
+          mergeAvailablePeriods([period]);
+        } else {
+          addToast({ type: 'warning', message: `账期月份无效：${period}` });
+        }
+      } else if (input) {
+        addToast({ type: 'warning', message: '账期格式应为 YYYY-MM，例如 2026-09' });
+      }
+      // 恢复 select 显示为当前账期
+      e.target.value = currentPeriod;
+      return;
+    }
+    setCurrentPeriod(value);
   };
 
   return (
@@ -60,6 +91,7 @@ const Navbar: React.FC<NavbarProps> = ({ title = '小虾记账' }) => {
                   {p}
                 </option>
               ))}
+              <option value={NEW_PERIOD_OPTION}>➕ 新建账期...</option>
             </select>
           </div>
 

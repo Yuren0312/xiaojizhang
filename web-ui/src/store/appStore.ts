@@ -23,6 +23,7 @@ interface AppState {
 
   setCurrentPeriod: (period: AccountingPeriod) => void;
   refreshAvailablePeriods: () => void;
+  mergeAvailablePeriods: (periods: AccountingPeriod[]) => void;
   addToast: (toast: Omit<ToastMessage, 'id'>) => void;
   removeToast: (id: string) => void;
   setShowSettings: (show: boolean) => void;
@@ -50,6 +51,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   refreshAvailablePeriods: () => {
     set({ availablePeriods: getAvailablePeriods() });
+  },
+
+  mergeAvailablePeriods: (periods) => {
+    const merged = new Set<string>([...getAvailablePeriods(), ...periods]);
+    set({ availablePeriods: Array.from(merged).sort() });
   },
 
   addToast: (toast) => {

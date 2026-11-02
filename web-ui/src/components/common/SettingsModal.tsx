@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import Modal from '../ui/Modal';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import { getConfig, saveConfig, type CompanyConfig } from '../../services/rulesApi';
 import { getPreferences, setPreferences } from '../../services/localStorage';
 
@@ -18,6 +19,8 @@ const SettingsModal: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [pendingNavigate, setPendingNavigate] = useState<string | null>(null);
 
   useEffect(() => {
     if (showSettings && !loaded) {
@@ -58,15 +61,39 @@ const SettingsModal: React.FC = () => {
     }
   };
 
+  const handleRequestClose = () => {
+    if (isDirty) {
+      setPendingNavigate(null);
+      setShowDiscardConfirm(true);
+    } else {
+      setShowSettings(false);
+    }
+  };
+
+  const handleOpenRulesConfig = () => {
+    if (isDirty) {
+      setPendingNavigate('/rules-config');
+      setShowDiscardConfirm(true);
+    } else {
+      setShowSettings(false);
+      navigate('/rules-config');
+    }
+  };
+
+  const handleDiscardConfirmed = () => {
+    setShowDiscardConfirm(false);
+    setIsDirty(false);
+    setShowSettings(false);
+    if (pendingNavigate) {
+      navigate(pendingNavigate);
+      setPendingNavigate(null);
+    }
+  };
+
   return (
     <Modal
       isOpen={showSettings}
-      onClose={() => {
-        if (isDirty) {
-          // 保留脏数据但不保存的提示可以简化
-        }
-        setShowSettings(false);
-      }}
+      onClose={handleRequestClose}
       title="⚙️ 设置"
       size="md"
     >
@@ -166,10 +193,7 @@ const SettingsModal: React.FC = () => {
             <div className="border-t border-gray-200 pt-4">
               <h4 className="text-sm font-semibold text-text-primary mb-2">🛠 高级配置</h4>
               <button
-                onClick={() => {
-                  setShowSettings(false);
-                  navigate('/rules-config');
-                }}
+                onClick={handleOpenRulesConfig}
                 className="w-full py-2.5 text-sm font-medium text-primary-500 bg-primary-50 
                            hover:bg-primary-100 rounded-lg transition-fast cursor-pointer"
               >
@@ -198,7 +222,7 @@ const SettingsModal: React.FC = () => {
         {/* Buttons */}
         <div className="flex gap-3 pt-2">
           <button
-            onClick={() => setShowSettings(false)}
+            onClick={handleRequestClose}
             className="flex-1 py-2 text-sm font-medium text-text-secondary bg-gray-100 
                        hover:bg-gray-200 rounded-lg transition-fast cursor-pointer"
           >
@@ -217,6 +241,20 @@ const SettingsModal: React.FC = () => {
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={showDiscardConfirm}
+        title="放弃未保存的修改？"
+        message="设置中有尚未保存的改动，关闭后将丢失，是否继续？"
+        confirmText="放弃修改"
+        cancelText="继续编辑"
+        variant="danger"
+        onConfirm={handleDiscardConfirmed}
+        onCancel={() => {
+          setShowDiscardConfirm(false);
+          setPendingNavigate(null);
+        }}
+      />
     </Modal>
   );
 };

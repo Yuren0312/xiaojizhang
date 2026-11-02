@@ -5,7 +5,7 @@ export type ModuleStatus = 'none' | 'partial' | 'completed' | 'na';
 export type MissingFlag = 'delayed' | 'not_applicable' | null;
 
 // Module IDs
-export type ModuleId = 'revenue' | 'expenses' | 'bank' | 'payroll' | 'company-info';
+export type ModuleId = 'revenue' | 'expenses' | 'bank' | 'payroll' | 'company-info' | 'tax-adjust';
 
 // Module definition
 export interface ModuleDefinition {

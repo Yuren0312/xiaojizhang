@@ -134,12 +134,14 @@ const HomePage: React.FC = () => {
                     <span>{config.label}</span>
                   </div>
 
-                  <button
-                    className="w-full mt-auto py-2 text-sm font-medium text-primary-500 bg-primary-50 
-                               hover:bg-primary-100 rounded-lg transition-fast cursor-pointer"
+                  {/* 视觉按钮样式，但保持单一可交互元素（外层 div 承担点击），
+                      避免 role=button 内嵌真实 button 造成嵌套交互与可访问性问题 */}
+                  <span
+                    className="block w-full mt-auto py-2 text-sm font-medium text-primary-500 bg-primary-50 
+                               text-center rounded-lg transition-fast"
                   >
                     进入录入
-                  </button>
+                  </span>
                 </div>
               );
             })}

@@ -10,12 +10,15 @@
 数据来源：
   - 利润表：营业收入、营业成本、利润总额
   - 小微企业优惠政策：年应纳税所得额 ≤ 300 万元
-  - 资产总额 / 从业人数：【依赖未实现数据源】资产台账 + 员工名册
+  - 资产总额 / 从业人数：资产台账 + 员工名册（可选，已支持自动采集）——
+      输入/企业信息/{资产台账, 固定资产台账, asset_ledger}.xlsx 与
+      输入/企业信息/{员工名册, employee_roster}.xlsx
+      （parsers/asset_employee_ledger.py）
 
 ⚠ 当前为示例科技有限公司（有限公司），默认生成 A类 企业所得税底稿。
    个体户模式需在调用时传入 entity_type="individual"。
 
-⚠ 资产总额/从业人数数据源缺失时，生成模板级输出并在文件名加 [模板] 前缀。
+⚠ 资产总额/从业人数未提供时按小微企业优惠从严判定，并在文件名加 [模板] 前缀。
 """
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.workbook import Workbook
 
 from ..models import ReportSet, ZERO, money
+from ..tax_adjust import TaxAdjust
 
 # ── 样式常量 ────────────────────────────────────────────────────────────
 HEADER_FILL = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
@@ -133,7 +137,8 @@ def _calc_individual_tax(annual_taxable_income: Decimal) -> Decimal:
         prev_bracket = upper if upper is not None else prev_bracket
         if remaining <= ZERO:
             break
-    return total_tax
+    # 税额量化到分，避免多位小数写入预缴表
+    return money(total_tax)
 
 
 # ── Sheet 1: 企业所得税月（季）度预缴申报表（A类） ─────────────────
@@ -142,7 +147,8 @@ def _corp_income_tax_a(ws, report_set, prior_report_set,
                        year: int, month: int, quarter: int,
                        asset_total: Decimal | None,
                        employee_count: int | None,
-                       is_template: bool) -> None:
+                       is_template: bool,
+                       adjust: TaxAdjust | None = None) -> None:
     """企业所得税 A 类预缴申报底稿"""
 
     # 数据提取
@@ -156,31 +162,45 @@ def _corp_income_tax_a(ws, report_set, prior_report_set,
         profit_total_ytd = ZERO
 
     # 小微企业判定
-    # 【依赖未实现数据源】资产总额、从业人数 来自资产台账 + 员工名册
+    # 资产总额 / 从业人数由 run_full 从资产台账 + 员工名册采集（可选输入）；
+    data_missing = asset_total is None or employee_count is None  # 资产/人数数据缺失
     if asset_total is None:
         asset_total = ZERO  # 缺失时标记为模板
     if employee_count is None:
         employee_count = 0
 
+    # ── 税务调整项（纳税调整 / 弥补亏损 / 减免 / 已预缴）──
+    # 这三类台账（预缴税款台账、纳税调整台账、税收优惠台账）没有统一格式，
+    # 由会计在前端「税务调整」页录入，程序只负责代入并校验勾稽关系。
+    adj = adjust or TaxAdjust()
+    tax_prepaid = money(adj.income_tax_prepaid)
+    prior_overpaid = money(adj.prior_overpaid)
+
+    # 应纳税所得额 = 利润总额 + 纳税调增 − 纳税调减 − 弥补以前年度亏损
+    # 注意：小微资格判定用的是「应纳税所得额」而非「利润总额」，
+    # 存在调整项时两者并不相等（如招待费超标调增后可能突破 300 万）。
+    taxable_income = money(profit_total_ytd + adj.taxable_adjustment)
+    if taxable_income < ZERO:
+        taxable_income = ZERO
+
     is_small_profit = (
-        profit_total_ytd <= SMALL_PROFIT_THRESHOLD
+        taxable_income <= SMALL_PROFIT_THRESHOLD
         and (asset_total <= SMALL_PROFIT_ASSET_MAX or asset_total == ZERO)
         and (employee_count <= SMALL_PROFIT_EMPLOYEE_MAX or employee_count == 0)
     )
 
-    # 应纳税额计算
-    if is_small_profit and profit_total_ytd > ZERO:
-        tax_payable = profit_total_ytd * SMALL_PROFIT_RATE
+    # 应纳税额计算（税额 = 基数 × 税率，一律量化到分）
+    # 亏损/累计亏损：应纳税所得额为 0，应纳所得税为 0。已预缴税款留待以后
+    # 抵缴，这里不出负数（负退税会被税局系统判为异常申报）。
+    if taxable_income <= ZERO:
+        tax_payable = ZERO
+        effective_rate = ZERO
+    elif is_small_profit:
+        tax_payable = money(taxable_income * SMALL_PROFIT_RATE)
         effective_rate = SMALL_PROFIT_RATE
     else:
-        tax_payable = profit_total_ytd * CORP_TAX_RATE
+        tax_payable = money(taxable_income * CORP_TAX_RATE)
         effective_rate = CORP_TAX_RATE
-
-    # 已预缴税额：【依赖未实现数据源】前期预缴台账
-    tax_prepaid = ZERO
-
-    # 本期应补（退）
-    tax_due = tax_payable - tax_prepaid
 
     # ── 标题 ──
     ws.merge_cells("A1:F1")
@@ -221,17 +241,19 @@ def _corp_income_tax_a(ws, report_set, prior_report_set,
     row = header_row + 1
 
     # 主表行
+    # 注意：利润总额取 is_ytd[30]（含税金及附加、期间费用、投资收益等），
+    # 并非简单的 1−2−3，故行4标签直接写「利润总额」以保持一致。
     lines = [
         (1,  "一、营业收入", revenue_ytd),
         (2,  "　　减：营业成本", cost_ytd),
         (3,  "　　减：税金及附加", report_set.is_ytd.get(3, ZERO) if report_set else ZERO),
-        (4,  "　利润总额（1−2−3）", profit_total_ytd),
-        (5,  "　加：纳税调增额", ZERO),  # 【依赖未实现数据源】纳税调整台账
-        (6,  "　减：纳税调减额", ZERO),  # 【依赖未实现数据源】纳税调整台账
-        (7,  "　减：弥补以前年度亏损", ZERO),  # 【依赖未实现数据源】亏损弥补台账
-        (8,  "　实际利润额（4+5−6−7）", profit_total_ytd),
+        (4,  "　利润总额", profit_total_ytd),
+        (5,  "　加：纳税调增额", adj.increase),
+        (6,  "　减：纳税调减额", adj.decrease),
+        (7,  "　减：弥补以前年度亏损", adj.loss_offset),
+        (8,  "　实际利润额（4+5−6−7）", taxable_income),
         (9,  "　税率（25%）", f"{float(CORP_TAX_RATE)*100:.0f}%"),
-        (10, "　应纳所得税额（8×9）", profit_total_ytd * CORP_TAX_RATE),
+        (10, "　应纳所得税额（8×9）", money(taxable_income * CORP_TAX_RATE)),
     ]
 
     for line_no, name, value in lines:
@@ -244,23 +266,37 @@ def _corp_income_tax_a(ws, report_set, prior_report_set,
     ws.cell(row=row, column=1).fill = SECTION_FILL
     row += 1
 
-    # 小微企业减免
-    if is_small_profit and profit_total_ytd > ZERO:
-        tax_full = profit_total_ytd * CORP_TAX_RATE
-        tax_reduced = profit_total_ytd * SMALL_PROFIT_RATE
-        small_profit_exemption = tax_full - tax_reduced
+    # 小微企业减免（tax_full/tax_reduced 均量化到分，减免额随之精确到分）
+    if is_small_profit and taxable_income > ZERO:
+        tax_full = money(taxable_income * CORP_TAX_RATE)
+        tax_reduced = money(taxable_income * SMALL_PROFIT_RATE)
+        small_profit_exemption = money(tax_full - tax_reduced)
     else:
         small_profit_exemption = ZERO
+
+    other_exemption = money(adj.other_exemption)
+    exemption_total = small_profit_exemption + other_exemption
 
     exemption_lines = [
         (11, "符合条件的小型微利企业减免所得税额",
          small_profit_exemption),
-        (12, "其他减免所得税额", ZERO),  # 【依赖未实现数据源】税收优惠台账
+        (12, "其他减免所得税额", other_exemption),
     ]
 
     for line_no, name, value in exemption_lines:
         _write_row(ws, row, [line_no, name, float(value)], money_cols)
         row += 1
+
+    # 本期应补（退）：行16 = 行10（法定税率应纳额）− 行13 − 行14 − 行15
+    # 注意不能用 tax_payable（小微已按 5% 算过），否则减免额会被扣两次。
+    # 有利润时允许为负（预缴超应纳 → 可退/可抵）；亏损时固定 0，不出负退税。
+    if taxable_income <= ZERO:
+        tax_due = ZERO
+    else:
+        tax_due = money(
+            money(taxable_income * CORP_TAX_RATE)
+            - exemption_total - tax_prepaid - prior_overpaid
+        )
 
     # ── 最终税额 ──
     row += 1
@@ -270,9 +306,9 @@ def _corp_income_tax_a(ws, report_set, prior_report_set,
     row += 1
 
     final_lines = [
-        (13, "减：减免所得税额（11+12）", small_profit_exemption),
-        (14, "减：已预缴所得税额", tax_prepaid),  # 【依赖未实现数据源】预缴台账
-        (15, "减：以前年度多缴在本期抵缴", ZERO),  # 【依赖未实现数据源】汇算清缴数据
+        (13, "减：减免所得税额（11+12）", exemption_total),
+        (14, "减：已预缴所得税额", tax_prepaid),
+        (15, "减：以前年度多缴在本期抵缴", prior_overpaid),
         (16, "本期应补（退）所得税额（10−13−14−15）", tax_due),
     ]
 
@@ -296,8 +332,8 @@ def _corp_income_tax_a(ws, report_set, prior_report_set,
     conditions = [
         ("年应纳税所得额 ≤ 300 万",
          "≤ 3,000,000",
-         float(profit_total_ytd),
-         "✓" if profit_total_ytd <= SMALL_PROFIT_THRESHOLD else "✗"),
+         float(taxable_income),
+         "✓" if taxable_income <= SMALL_PROFIT_THRESHOLD else "✗"),
         ("资产总额 ≤ 5000 万",
          "≤ 50,000,000",
          float(asset_total) if asset_total > ZERO else "【数据缺失】",
@@ -317,7 +353,11 @@ def _corp_income_tax_a(ws, report_set, prior_report_set,
     # 小微企业判定结果
     row += 1
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
-    if is_small_profit:
+    if data_missing:
+        # 资产总额/从业人数缺失（0 占位）时 is_small_profit 会因「或0」条件恒真，
+        # 此时不能断言「符合小微」，应提示补录数据
+        status_text = "⚠ 资产总额/从业人数数据缺失，待补录后重新判定小微企业资格"
+    elif is_small_profit:
         status_text = (f"✅ 符合小微企业条件 → 实际税负 {float(SMALL_PROFIT_RATE)*100:.0f}% "
                        f"→ 应纳所得税额 {float(tax_payable):,.2f} 元")
     else:
@@ -329,10 +369,12 @@ def _corp_income_tax_a(ws, report_set, prior_report_set,
     notes = [
         "数据源说明：",
         "• 营业收入、营业成本、利润总额：来自利润表本年累计数",
-        "• 纳税调整项目：【依赖未实现数据源】纳税调整台账",
+        (f"• 纳税调整/弥补亏损/减免/已预缴：会计录入（{adj.source}）"
+         if adj.source else
+         "• 纳税调整/弥补亏损/减免/已预缴：【未录入，按 0 计】请在「税务调整」页补录"),
         "• 资产总额：资产台账（净值合计，输入/企业信息/资产台账.xlsx）",
         "• 从业人数：员工名册（输入/企业信息/员工名册.xlsx）",
-        "• 已预缴税额：【依赖未实现数据源】前期预缴台账",
+        "• 应纳税所得额 = 利润总额 + 纳税调增 − 纳税调减 − 弥补以前年度亏损",
     ]
     for note in notes:
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
@@ -373,7 +415,7 @@ def _individual_income_tax(ws, report_set, year: int, month: int, quarter: int,
 
     # 已预缴：【依赖未实现数据源】前期预缴台账
     tax_prepaid = ZERO
-    tax_due = tax_payable - tax_prepaid
+    tax_due = money(tax_payable - tax_prepaid)
 
     # ── 标题 ──
     ws.merge_cells("A1:E1")
@@ -472,8 +514,9 @@ def generate(
     month: int,
     entity_type: str = "corp",   # "corp" = 有限公司 / "individual" = 个体户
     prior_report_set=None,       # 上期 ReportSet（本年累计计算需要）
-    asset_total: Decimal | None = None,    # 【依赖未实现数据源】资产总额
-    employee_count: int | None = None,     # 【依赖未实现数据源】从业人数
+    asset_total: Decimal | None = None,    # 资产总额（可选：输入/企业信息/资产台账.xlsx）
+    employee_count: int | None = None,     # 从业人数（可选：输入/企业信息/员工名册.xlsx）
+    adjust: TaxAdjust | None = None,       # 税务调整项（输入/<账期>/_tax-adjust_补充说明.txt）
     out_path: Path | str | None = None,
 ) -> tuple[Path, bool]:
     """生成所得税预缴底稿 xlsx。
@@ -486,6 +529,8 @@ def generate(
         prior_report_set: 上期报表
         asset_total: 资产总额期末数（万元或元）
         employee_count: 季度平均从业人数
+        adjust: 税务调整项（纳税调增/调减、弥补亏损、其他减免、已预缴）。
+            未提供时全部按 0 计，等同于「未做纳税调整」。
         out_path: 输出路径
 
     Returns:
@@ -518,7 +563,7 @@ def generate(
         ws1.title = "企业所得税A类预缴"
         _corp_income_tax_a(ws1, report_set, prior_report_set,
                           year, month, quarter, asset_total, employee_count,
-                          is_template)
+                          is_template, adjust)
     else:
         ws1 = wb.active
         ws1.title = "经营所得个税预缴"

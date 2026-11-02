@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
-import { setResultFiles, setResultGeneratedAt, invalidateResultCache, clearPeriodCache, getResultFilesKey, getResultGeneratedAtKey, getPreferences } from '../services/localStorage';
+import { setResultFiles, setResultGeneratedAt, invalidateResultCache, clearPeriodCache, getResultFilesKey, getResultGeneratedAtKey, getPreferences, isInputDirty, clearInputDirty } from '../services/localStorage';
 import {
   API_BASE,
   downloadResult,
   archivePeriod,
   startComputeTask,
   getComputeTask,
+  listResults,
   type OutputFile,
   type ComputeResponse,
 } from '../services/api';
@@ -34,6 +35,36 @@ function apiOutputsToResultFiles(outputs: OutputFile[]): ResultFile[] {
     description: '',
     indexedDBKey: o.download_url,
   }));
+}
+
+/** 后端 outputs 的 label 是固定字符串，与文件名并不完全一致（如文件名带 "[模板] " 前缀）。
+ *  这里按已知 label 做包含匹配，保证从文件名反推出来的 label 能落进界面分组白名单。 */
+const KNOWN_OUTPUT_LABELS = [
+  '会计报表',
+  '银行对账报告',
+  '核算汇总表',
+  '分析简报',
+  '增值税申报底稿',
+  '所得税预缴底稿',
+  '个税扣缴明细表',
+  '记账凭证',
+  '试算平衡表',
+  // 电子税务局报送格式（p10）。必须放在这里：文件是 .xls 且名字带「（税局报送）」后缀，
+  // 不登记的话从服务器结果恢复时会被分组白名单过滤掉，用户看不到这两个文件。
+  '资产负债表（税局报送）',
+  '利润表（税局报送）',
+];
+
+/**
+ * 从文件名反推展示用标题：去掉扩展名和账期前缀。
+ * 服务器已有结果接口只回 name/size/ext，没有 label；界面分类与标题都依赖 label。
+ */
+function labelFromFilename(period: string, name: string): string {
+  const noExt = name.replace(/\.[^.]+$/, '');
+  const known = KNOWN_OUTPUT_LABELS.find((l) => noExt.includes(l));
+  if (known) return known;
+  const stripped = noExt.startsWith(period) ? noExt.slice(period.length).trim() : noExt;
+  return stripped || noExt;
 }
 
 const ResultPage: React.FC = () => {
@@ -105,6 +136,9 @@ const ResultPage: React.FC = () => {
         setProgress(100);
         setProgressText('运算完成！');
 
+        // 计算成功，输入变更标记到此才算消费掉：失败时保留，下次进入仍会重算
+        clearInputDirty(currentPeriod);
+
         const files = apiOutputsToResultFiles(result.outputs);
         setResultFilesState(files);
         setStats(result.stats);
@@ -122,8 +156,7 @@ const ResultPage: React.FC = () => {
         }
 
         setPhase('success');
-      } else if (result.errors.length > 0) {
-        setPhase('error');
+      } else if (result.errors.length > 0) {        setPhase('error');
         setErrorMessage(result.errors.join('；'));
         setErrorDetail('请检查输入资料是否正确，或联系管理员查看引擎日志。');
       } else {
@@ -142,8 +175,12 @@ const ResultPage: React.FC = () => {
     }
   }, [currentPeriod, addToast]);
 
-  // 页面加载：先检查是否有缓存
+  // 页面加载顺序：本地缓存 → 服务器上该账期已有的结果 → 都没有才真正开算。
+  // 第三级判断很关键：本地缓存只存在浏览器里，换设备/清缓存/无痕都会 miss。
+  // 若直接开算，任何人第一次打开结果页都会触发一次全量计算并覆盖输出目录。
   useEffect(() => {
+    let cancelled = false;
+
     const cached = localStorage.getItem(getResultFilesKey(currentPeriod));
     const cachedAt = localStorage.getItem(getResultGeneratedAtKey(currentPeriod));
 
@@ -157,15 +194,54 @@ const ResultPage: React.FC = () => {
           // Stale if cached > 30 min ago
           const ageMs = Date.now() - new Date(cachedAt).getTime();
           setIsStale(ageMs > 30 * 60 * 1000);
-          return;
+          return () => {
+            computeRef.current?.abort();
+          };
         }
       } catch { /* ignore */ }
     }
 
-    // 没有有效缓存，自动触发运算
-    runComputation();
+    // 输入资料在上传/删除后已被标记为变更：服务器上的旧结果不可信，直接重算
+    if (isInputDirty(currentPeriod)) {
+      runComputation();
+      return () => {
+        computeRef.current?.abort();
+      };
+    }
+
+    (async () => {
+      // 第二级：问服务器有没有算好的结果，有就直接展示，不重算
+      try {
+        const { files } = await listResults(currentPeriod);
+        if (cancelled) return;
+        if (Array.isArray(files) && files.length > 0) {
+          const mapped: ResultFile[] = files.map((f) => ({
+            id: f.name,
+            name: f.name,
+            size: f.size,
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            label: labelFromFilename(currentPeriod, f.name),
+            description: '',
+            // 与后端 download_url 同构，预览/下载走同一路径
+            indexedDBKey: `/api/results/${currentPeriod}/${f.name}`,
+          }));
+          setResultFilesState(mapped);
+          setPhase('success');
+          setProgress(100);
+          setIsStale(false);
+          return;
+        }
+      } catch {
+        /* 查询失败不阻塞用户，退回原有行为：直接计算 */
+      }
+
+      if (cancelled) return;
+      // 第三级：确实没有现成结果，才触发计算
+      runComputation();
+    })();
 
     return () => {
+      cancelled = true;
       computeRef.current?.abort();
     };
   }, [currentPeriod, runComputation]);
@@ -310,7 +386,11 @@ const ResultPage: React.FC = () => {
     ['会计报表', '银行对账报告', '核算汇总表', '分析简报', '记账凭证', '试算平衡表'].includes(f.label)
   );
   const extOutputs = resultFiles.filter((f) =>
-    ['增值税申报底稿', '所得税预缴底稿', '个税扣缴明细表'].includes(f.label)
+    [
+      '增值税申报底稿', '所得税预缴底稿', '个税扣缴明细表',
+      // 税局报送表：可直接上传电子税务局，与「底稿」并列展示
+      '资产负债表（税局报送）', '利润表（税局报送）',
+    ].includes(f.label)
   );
 
   return (
@@ -581,7 +661,7 @@ const ResultPage: React.FC = () => {
             <h3 className="text-base font-semibold text-text-primary mb-4">
               扩展输出区
               <span className="text-xs text-text-disabled font-normal ml-2">
-                {extOutputs.length > 0 ? '税务申报底稿' : '暂无数据'}
+                {extOutputs.length > 0 ? '税务申报底稿 · 电子税务局报送表' : '暂无数据'}
               </span>
             </h3>
             {extOutputs.length > 0 ? (

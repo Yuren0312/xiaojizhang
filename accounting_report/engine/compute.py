@@ -64,6 +64,63 @@ def _fill(values: dict[int, Decimal], n: int) -> dict[int, Decimal]:
     return {line: values.get(line, ZERO) for line in range(1, n + 1)}
 
 
+def prior_from_trial_balance(trial_balances, year: int, month: int) -> PriorPeriod | None:
+    """用科目余额表的「期初余额」列构造上期期末快照。
+
+    用途：未找到上月报表时的最后一级兜底。科目余额表本身带期初余额，
+    是比报表 PDF 更可靠的期初来源（PDF 只有本期列、版式还多变）；
+    不接这条兜底时，单月补跑/首月导入会退化成「期初全 0」，
+    资产负债表期末只剩本期净变化，银行对账的账面余额也跟着错。
+
+    口径与过账一致：自然方向为正（资产/费用借方为正，负债/权益/收入贷方为正）。
+    父子科目去重：有下级科目的编码（如 1002，其下有 100201）整行跳过，
+    否则「银行存款 + 中国工商银行」会把同一笔余额算两遍。
+
+    期初全为 0（新设账套或表里没有期初列）时返回 None，由调用方回退到零余额。
+    """
+    rows = [t for t in (trial_balances or []) if getattr(t, "account_code", None)]
+    if not rows:
+        return None
+
+    codes = {str(t.account_code) for t in rows}
+    parents = {c for c in codes if any(o != c and o.startswith(c) for o in codes)}
+
+    rules = balance_sheet_rules()
+    subs = set(rules["sub_lines"])
+
+    by_line: dict[int, Decimal] = defaultdict(lambda: ZERO)
+    nonzero = False
+    for t in rows:
+        if str(t.account_code) in parents:
+            continue  # 父科目由下级明细代表，避免重复累计
+        try:
+            acct = resolve_account(t.account_name)
+        except KeyError:
+            continue  # 未登记的科目不进报表，行为与过账一致
+        if acct.bs is None:
+            continue
+        # 与 _balance_sheet 取数口径一致：明细行只认 bs_sub
+        if acct.bs in subs:
+            if acct.bs_sub is None:
+                continue
+            line = acct.bs_sub
+        else:
+            line = acct.bs
+        balance = t.open_debit - t.open_credit
+        if not acct.natural_debit:
+            balance = -balance
+        if balance:
+            nonzero = True
+        by_line[line] = _r2(by_line[line] + balance)
+
+    if not nonzero:
+        return None
+
+    bs_end = apply_totals(_fill(by_line, BS_LINES), rules)
+    py, pm = (year, month - 1) if month > 1 else (year - 1, 12)
+    return PriorPeriod(year=py, month=pm, bs_end=bs_end)
+
+
 def _is_carryover(entry: JournalEntry, dr, cr) -> bool:
     """判定结转/结清损益凭证（不进利润表业务发生额）
 

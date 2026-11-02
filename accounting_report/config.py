@@ -23,10 +23,18 @@ _BUNDLED_RULES_DIR = PKG_DIR / "rules"
 _RUNTIME_RULES_DIR = ROOT / "accounting_report" / "rules"
 
 RULES_DIR = _RUNTIME_RULES_DIR if _RUNTIME_RULES_DIR.exists() else _BUNDLED_RULES_DIR
-TEMPLATE_PATH = PKG_DIR / "templates" / "报表模板.xlsx"
+
+# 模板目录：报表模板.xlsx + 电子税务局的两张空白 .xls（会小企01/02表）。
+# 报送模块（writers/p10_tax_filing.py）以税局空白表当底稿填数，必须从这里取。
+TEMPLATES_DIR = PKG_DIR / "templates"
+TEMPLATE_PATH = TEMPLATES_DIR / "报表模板.xlsx"
 
 # 报表表头的企业名称。换一家主体只改这一行，模板不用动。
 COMPANY_NAME = "示例科技有限公司"
+
+# 纳税人识别号（统一社会信用代码）。电子税务局报送表头必填，
+# 留空则输出文件该格为空，需手工补。换主体时与 COMPANY_NAME 一起改。
+TAX_NO = "91110108MA00000000"
 
 # 上期报表 PDF 目录（首次使用时放上月 5 表 PDF 的位置）。
 # 设为 None 则不启用此 fallback，仅依赖输出目录中的上月 xlsx。

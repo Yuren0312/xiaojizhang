@@ -25,12 +25,15 @@ const Toast: React.FC = () => {
     <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
       {toasts.map((toast) => {
         const Icon = iconMap[toast.type];
+        // 错误用 role="alert"（打断式提示）；成功/警告/信息用 role="status"，
+        // 避免非关键 toast 每次都触发屏幕阅读器打断播报
+        const roleAttr = toast.type === 'error' ? 'alert' : 'status';
         return (
           <div
             key={toast.id}
             className={`${colorMap[toast.type]} rounded-lg px-4 py-3 shadow-lg flex items-center gap-2 
                         min-w-[280px] max-w-[400px] animate-slide-in-right pointer-events-auto`}
-            role="alert"
+            role={roleAttr}
           >
             <Icon size={18} className="shrink-0" />
             <span className="text-sm flex-1">{toast.message}</span>

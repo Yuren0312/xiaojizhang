@@ -11,6 +11,25 @@ from accounting_report.engine.compute import _income_flow, build
 from accounting_report.models import JournalEntry, PriorPeriod, ReportSet, ZERO
 
 
+def _real_input_dir(*periods: str) -> Path:
+    """返回真实账套输入目录；数据不在就跳过，而不是让用例红着。
+
+    真实账套（银行流水、发票、工资表）永远不进仓库，所以克隆下来跑测试时
+    这些用例必然没有数据。只判 ``输入/`` 是否存在是不够的 —— 本文件其他用例
+    会创建 ``输入/`` 放合成 fixture，目录在、里面却不是真实账期数据，于是
+    用例一路跑到断言才炸。改成校验具体账期目录非空。
+    """
+    d = Path("输入")
+    need = periods or ("2026-06",)
+    if not d.is_dir():
+        pytest.skip("真实账套数据未就位（仓库不含真实账套）")
+    for per in need:
+        sub = d / per
+        if not sub.is_dir() or not any(sub.rglob("*")):
+            pytest.skip(f"真实账套数据未就位（缺 {per} 期数据）")
+    return d
+
+
 def _e(date, summary, debit, credit, amount):
     return JournalEntry(date=date, summary=summary, debit=debit, credit=credit,
                         amount=Decimal(str(amount)), source="test")
@@ -116,9 +135,7 @@ def test_all_vouchers_balanced():
     from pathlib import Path
     from accounting_report.full_pipeline import run_chain
     import tempfile
-    input_dir = Path("输入")
-    if not input_dir.exists():
-        pytest.skip("真实数据未就位")
+    input_dir = _real_input_dir("2025-12", "2026-06")
     out = Path(tempfile.mkdtemp(prefix="regress_"))
     periods = [(2025, 12), (2026, 1), (2026, 2), (2026, 3), (2026, 4), (2026, 5), (2026, 6)]
     results = run_chain(periods, input_dir=input_dir, output_dir=out)
@@ -171,9 +188,7 @@ def test_p2_summary_has_data():
     from pathlib import Path
     from accounting_report.full_pipeline import run_chain
     import tempfile, openpyxl
-    input_dir = Path("输入")
-    if not input_dir.exists():
-        pytest.skip("真实数据未就位")
+    input_dir = _real_input_dir()
     out = Path(tempfile.mkdtemp(prefix="p2_"))
     run_chain([(2026, 6)], input_dir=input_dir, output_dir=out)
     wb = openpyxl.load_workbook(list(out.glob("2026-06 核算汇总表.xlsx"))[0], data_only=True)
@@ -221,9 +236,7 @@ def test_bank_reconciliation_consistent():
     from pathlib import Path
     from accounting_report.full_pipeline import run_chain
     import tempfile, openpyxl
-    input_dir = Path("输入")
-    if not input_dir.exists():
-        pytest.skip("真实数据未就位")
+    input_dir = _real_input_dir()
     out = Path(tempfile.mkdtemp(prefix="recon_"))
     run_chain([(2026, 6)], input_dir=input_dir, output_dir=out,
               initial_prior=None)
@@ -530,9 +543,7 @@ def test_vat_declaration_template_and_taxfree():
 def test_chain_prior_not_polluted_in_outputs():
     """run_chain 的本期输出必须用本期 prior（上期期末），
     不能用下期 prior——否则 output9 试算平衡表期初=本期期末（双重累计）。"""
-    input_dir = Path("输入")
-    if not input_dir.exists():
-        pytest.skip("真实数据未就位")
+    input_dir = _real_input_dir()
     import tempfile, openpyxl
     from accounting_report.full_pipeline import run_chain
     out = Path(tempfile.mkdtemp(prefix="chain_prior_"))
@@ -1031,6 +1042,7 @@ def test_run_full_attaches_report():
     from accounting_report.full_pipeline import run_full
     from accounting_report.config import INPUT_DIR, OUTPUT_DIR
 
+    _real_input_dir()
     # 用真实输入目录跑 2026-06（有凭证数据），确认 report 非 None 且勾稽一致
     result = run_full(2026, 6, INPUT_DIR, OUTPUT_DIR)
     assert result.report is not None, "run_full 必须挂载报表对象"
@@ -1691,9 +1703,7 @@ def test_p1_real_feb2026_reconciles_clean():
     from accounting_report.full_pipeline import run_chain
     import tempfile, openpyxl
     from decimal import Decimal as D
-    input_dir = Path("输入")
-    if not input_dir.exists():
-        pytest.skip("真实数据未就位")
+    input_dir = _real_input_dir()
     out = Path(tempfile.mkdtemp(prefix="p1feb_"))
     # 必须按序连跑（12→1→2）：prior 链不能跳月，否则账面余额错位
     results = run_chain([(2025, 12), (2026, 1), (2026, 2)],
@@ -1965,6 +1975,7 @@ def test_p1_jan2026_no_outstanding_and_balanced():
     from pathlib import Path
     from accounting_report.full_pipeline import run_chain
 
+    _real_input_dir("2025-12", "2026-01")
     tmp = Path(tempfile.mkdtemp(prefix="p1_jan_balance_"))
     run_chain([(2025, 12), (2026, 1)], output_dir=tmp)
 

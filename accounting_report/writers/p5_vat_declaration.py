@@ -8,7 +8,9 @@
 
 数据来源：
   - 收入数据：利润表 营业收入（行次1）
-  - 发票数据：【依赖未实现数据源】合同台账或发票台账
+  - 发票数据：发票台账（可选，已支持自动采集）——
+      输入/{YYYY-MM}/收入发票/invoice_ledger.xlsx、输入/企业信息/发票台账.xlsx，
+      或直接扫描输入目录下的发票 PDF 自动建台账（parsers/invoice_pdf.py）
   - 营业科目发生额：账务系统
   - 减免税优惠：小规模纳税人现行政策
 
@@ -117,7 +119,8 @@ def _auto_width(ws, min_width: int = 10, max_width: int = 55) -> None:
 
 def _vat_main_table(ws, report_set, year: int, month: int,
                     invoice_data: dict | None,
-                    is_template: bool) -> None:
+                    is_template: bool,
+                    adjust=None) -> None:
     """生成增值税申报主表底稿（模拟电子税务局格式）"""
 
     # 数据提取
@@ -150,8 +153,8 @@ def _vat_main_table(ws, report_set, year: int, month: int,
         vat_payable = money(total_taxable * VAT_REDUCED_RATE)
         effective_rate = VAT_REDUCED_RATE
 
-    # 已缴税额：【依赖未实现数据源】预缴税款台账
-    vat_prepaid = ZERO
+    # 已缴税额：来自「税务调整」页录入（预缴税款台账格式不统一，不做解析）
+    vat_prepaid = money(getattr(adjust, "vat_prepaid", ZERO))
 
     # 本期应补（退）
     vat_due = vat_payable - vat_prepaid
@@ -212,7 +215,7 @@ def _vat_main_table(ws, report_set, year: int, month: int,
     row += 1
 
     # 第2栏：其中：开具增值税专用发票不含税销售额
-    # 【依赖未实现数据源】发票台账 → 专票不含税金额
+    # 发票台账 → 专票不含税金额（未提供台账时为 0，该列留空）
     special_invoice_amount = ZERO
     if invoice_data:
         special_invoice_amount = money(invoice_data.get("special_invoice", ZERO))
@@ -226,7 +229,7 @@ def _vat_main_table(ws, report_set, year: int, month: int,
     row += 1
 
     # 第3栏：开具普通发票不含税销售额
-    # 【依赖未实现数据源】发票台账 → 普票不含税金额
+    # 发票台账 → 普票不含税金额（未提供台账时为 0，该列留空）
     _write_row(ws, row, [
         "　其中：开具普通发票销售额",
         3,
@@ -510,7 +513,7 @@ def _invoice_detail(ws, report_set, invoice_data: dict | None,
         ("① 利润表营业收入", float(revenue), ""),
         ("② 销项发票不含税金额合计", float(total_invoiced), ""),
         ("③ 无票收入", float(uninvoiced_revenue),
-         "发票台账自动解析" if not is_template else "【依赖未实现数据源】发票台账缺失，无法准确计算"),
+         "发票台账自动解析" if not is_template else "未提供发票台账，无法准确拆分"),
         ("④ 差异（① − ② − ③）",
          float(revenue - total_invoiced - uninvoiced_revenue),
          "应为免税收入金额（免税票不计入销项合计，属正常差异）" if not is_template else ""),
@@ -545,7 +548,8 @@ def generate(
     report_set,         # ReportSet 或 None
     year: int,
     month: int,
-    invoice_data: dict | None = None,  # 【依赖未实现数据源】发票台账解析结果
+    invoice_data: dict | None = None,  # 发票台账解析结果（可选；未提供时按无票处理）
+    adjust=None,                       # 税务调整项（取其中的 vat_prepaid）
     out_path: Path | str | None = None,
 ) -> tuple[Path, bool]:
     """生成增值税申报底稿 xlsx。
@@ -630,7 +634,8 @@ def generate(
     # Sheet 1: 增值税申报主表
     ws1 = wb.active
     ws1.title = "增值税申报主表"
-    _vat_main_table(ws1, report_set, year, month, invoice_data, is_template)
+    _vat_main_table(ws1, report_set, year, month, invoice_data, is_template,
+                    adjust=adjust)
 
     # Sheet 2: 附加税费计算
     ws2 = wb.create_sheet("附加税费计算")

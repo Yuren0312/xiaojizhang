@@ -1,6 +1,6 @@
 {
   "name": "xiaojizhang",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "小虾记账 - 小微企业智能代账桌面客户端",
   "main": "electron/main.js",
   "author": "小虾记账 Contributors",
